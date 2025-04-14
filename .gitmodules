@@ -1,0 +1,6 @@
+[submodule "elevation_mapping_cupy"]
+	path = elevation_mapping_cupy
+	url = https://github.com/leggedrobotics/elevation_mapping_cupy.git
+[submodule "Azure_Kinect_ROS_Driver"]
+	path = Azure_Kinect_ROS_Driver
+	url = https://github.com/microsoft/Azure_Kinect_ROS_Driver.git
