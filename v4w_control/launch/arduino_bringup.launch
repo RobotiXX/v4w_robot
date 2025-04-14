@@ -1,0 +1,9 @@
+<launch>
+	<node pkg="rosserial_python" type="serial_node.py" name="v4w_controller">
+		<param name="port" value="/dev/arduinoMega"/>
+		<param name="baud" value="115200"/>
+		<param name="scheduler" value="fifo"/>
+		<param name="priority" value="98"/>
+	</node>
+</launch>
+

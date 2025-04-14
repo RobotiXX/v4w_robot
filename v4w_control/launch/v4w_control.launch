@@ -1,0 +1,18 @@
+<launch>
+	<arg name="en_cam_control" default="False" />
+
+	<!-- load the parameters from config file -->
+	<rosparam file="$(find v4w_control)/config/param.yaml" command="load"/>
+
+	<node pkg="rosserial_python" type="serial_node.py" name="v4w_controller"/>
+
+	<!-- launch joystick node for PS4 joystick -->
+	<node pkg="joy" type="joy_node" name="joystick" />
+
+	<!-- launch camera stabilize if it is enabled -->
+	<node if="${en_cam_control}" pkg="v4w_control" type="camera_stablilizer.py" name="camera_stablilizer" />
+	
+	<!-- launch the command control and teleop -->
+	<node pkg ="v4w_control" type ="control.py" name ="v4w_control"/>
+	    
+</launch>

@@ -1,0 +1,28 @@
+<launch>
+	<group ns="v4w">
+		<!-- v4w control -->
+		<include file="$(find v4w_control)/launch/v4w_control.launch" >
+			<arg name="en_cam_control" default="False" />
+		</include>
+
+		<!-- launch azure kinet drivers -->
+		<include file="$(find azure_kinect_ros_driver)/launch/driver.launch",>
+			<arg name="point_cloud" value="true"/>
+			<arg name="rgb_point_cloud" value="false"/>
+			<arg name="fps" value="30"/>
+			<arg name="imu_rate_target" value="200"/>
+		</include>
+
+		<!-- compute IMU quaternion -->
+		<node pkg="imu_filter_madgwick" type="imu_filter_node" name="imu_filter_node">
+			<param name="use_mag" value="false" />
+			<param name="constant_dt" value="0.005" />
+			<param name="publish_tf" value="false" />
+			<param name="world_frame" value="enu" />
+			<remap from="/imu/data_raw" to="/imu" />
+			<remap from="/imu/data" to="/imu_filter" />
+
+		</node>
+	    
+	</group>
+</launch>

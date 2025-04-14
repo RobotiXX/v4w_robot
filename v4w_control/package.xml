@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package>
+  <name>v4w_control</name>
+  <version>0.0.1</version>
+  <description>Robot control for v4w</description>
+
+  <maintainer email="adatar@gmu.edu">Aniket Datar</maintainer>
+
+  <license>BSD</license>
+
+  <author email="adatar@gmu.edu">Aniket Datar</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roslaunch</build_depend>
+  <run_depend>rosserial_python</run_depend>
+
+  <export>
+  </export>
+</package>
