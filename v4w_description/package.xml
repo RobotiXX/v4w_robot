@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package>
+<package format="2">
   <name>v4w_description</name>
   <version>0.0.1</version>
   <description>URDF robot description for v4w</description>
@@ -11,10 +11,15 @@
   <author email="adatar@gmu.edu">Aniket Datar</author>
 
   <buildtool_depend>catkin</buildtool_depend>
+  
   <build_depend>roslaunch</build_depend>
-  <run_depend>robot_state_publisher</run_depend>
-  <run_depend>urdf</run_depend>
-  <run_depend>xacro</run_depend>
+  <build_depend>robot_state_publisher</build_depend>
+  <build_depend>urdf</build_depend>
+  <build_depend>xacro</build_depend>
+  
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>urdf</exec_depend>
+  <exec_depend>xacro</exec_depend>
 
   <export>
   </export>

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- TF prefix parameter -->
+  <arg name="tf_prefix" default="v4w1/" />
+
+  <!-- Load robot description -->
+  <param name="robot_description" command="$(find xacro)/xacro $(find v4w_description)/urdf/v4w.xacro prefix:=$(arg tf_prefix)" />
+
+  <!-- Robot state publisher with tf_prefix -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher">
+
+  </node>
+
+</launch>

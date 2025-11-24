@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="vertiwheeler">
+  
+  <!-- Prefix parameter -->
+  <xacro:arg name="prefix" default="v4w1" />
+  <xacro:property name="prefix" value="$(arg prefix)" />
+  
+  <link name="${prefix}base_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.2 0 -0.12"/>
+      <geometry>
+        <mesh filename="package://v4w_description/meshes/v4w.obj" scale="1 1 1"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.5708 0 0" xyz="-0.2 0 -0.1"/>
+      <geometry>
+        <mesh filename="package://v4w_description/meshes/v4w.stl" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <link name="${prefix}camera_pivot">
+  </link>
+  
+  <joint name="${prefix}camera_pivot_joint" type="fixed">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}camera_pivot"/>
+    <origin xyz="0.2 0 0.009" rpy="0 0 0"/>
+  </joint>
+</robot>
+

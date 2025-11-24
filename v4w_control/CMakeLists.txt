@@ -6,12 +6,15 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-  rosserial
+  nav_msgs
+  sensor_msgs
+  geometry_msgs
+  tf2_ros
 )
 
 ## Declare a catkin package, listing dependencies as needed.
 catkin_package(
-  CATKIN_DEPENDS roscpp rospy std_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs nav_msgs sensor_msgs geometry_msgs tf2_ros
 )
 
 ## Specify include directories (if you have header files, they would be added here)
@@ -26,9 +29,18 @@ install(DIRECTORY launch/
   FILES_MATCHING PATTERN "*.launch"
 )
 
+## Install config files:
+install(DIRECTORY config/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
+  FILES_MATCHING PATTERN "*.yaml"
+  PATTERN "*.yml"
+)
+
 ## Install Python scripts:
 catkin_install_python(PROGRAMS 
-  scripts/teleoperation.py
-  scripts/robot_control.py
+  scripts/control.py
+  scripts/imu_processor.py
+  scripts/odometry.py
+  scripts/utils.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
