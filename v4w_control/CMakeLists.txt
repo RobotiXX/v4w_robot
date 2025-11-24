@@ -39,8 +39,6 @@ install(DIRECTORY config/
 ## Install Python scripts:
 catkin_install_python(PROGRAMS 
   scripts/control.py
-  scripts/imu_processor.py
   scripts/odometry.py
-  scripts/utils.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
