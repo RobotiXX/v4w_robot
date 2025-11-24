@@ -151,7 +151,7 @@ def visualize(publisher, poses, frame_id="odom", ):
 
 #Model and transformation related functions
 @lru_cache(maxsize=2048)
-def ackermann(throttle, steering, wheel_base=0.324, dt=0.1):
+def ackermann(throttle, steering, wheel_base=0.312, dt=0.1):
     if not isinstance(throttle, torch.Tensor):
         throttle = torch.tensor(throttle, dtype=torch.float32)
     if not isinstance(steering, torch.Tensor):

@@ -11,6 +11,10 @@ from std_msgs.msg import Float32MultiArray
 
 from tf.transformations import euler_from_quaternion
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from spline_lookup import SplineLookupTable
 
 def clamp(x, x_min, x_max):
     return max(x_min, min(x_max, x))
@@ -59,6 +63,10 @@ class VertiWheelControlNode:
 
     def __init__(self):
         rospy.init_node("vertiwheeler_control_node")
+
+        self.neg_angle_lookup = SplineLookupTable.load(os.path.dirname(os.path.abspath(__file__))+"/v4w1_neg_steering_calibration")
+        self.pos_angle_lookup = SplineLookupTable.load(os.path.dirname(os.path.abspath(__file__))+"/v4w1_pos_steering_calibration")
+        self.throttle_lookup = SplineLookupTable.load(os.path.dirname(os.path.abspath(__file__))+"/v4w1_linear_calibration")
 
         # ===== Parameters =====
         # Control loop
@@ -150,6 +158,7 @@ class VertiWheelControlNode:
 
         # ===== ROS I/O =====
         self.pub_control = rospy.Publisher("control", Float32MultiArray, queue_size=1)
+        self.pub_real_cmd = rospy.Publisher("~real_cmd_vel", Twist, queue_size=1)
 
         rospy.Subscriber("joy", Joy, self.joy_callback, queue_size=1)
         rospy.Subscriber("cmd_vel", Twist, self.cmd_vel_callback, queue_size=1)
@@ -355,10 +364,15 @@ class VertiWheelControlNode:
             return 0.0, 0.0
 
         v = clamp(cmd_vel.linear.x, self.min_vel, self.max_vel)
+        throttle_robot = self.throttle_lookup.speed_to_cmd(v)
         # Assuming angular.z is already in steering units, just clamp
         steering = clamp(cmd_vel.angular.z, self.min_str, self.max_str)
         steering = clamp(steering + self.steer_trim, self.min_str, self.max_str)
-        return steering, v
+        if steering < 0.0:
+            steering_robot = self.neg_angle_lookup.speed_to_cmd(steering)
+        else:
+            steering_robot = self.pos_angle_lookup.speed_to_cmd(steering)
+        return steering_robot, throttle_robot
 
     def apply_accel_limit(self, desired_throttle, dt):
         """Limit acceleration/deceleration for throttle channel."""
@@ -422,10 +436,24 @@ class VertiWheelControlNode:
             else:
                 if self.mode == self.MODE_AUTO:
                     steering_raw, throttle_raw = self.cmd_vel_to_commands(self.last_cmd_vel)
+                    steering_robot = steering_raw
+                    throttle_robot = throttle_raw
+
                 else:  # MANUAL
                     # Use last joystick axes if available, else keep old commands
                     axes = self.last_joy_axes if self.last_joy_axes else []
                     steering_raw, throttle_raw = self.joy_to_commands(axes)
+                    throttle_robot = self.throttle_lookup.cmd_to_speed(throttle_raw)
+                    if steering_raw < 0.0:
+                        steering_robot = self.neg_angle_lookup.cmd_to_speed(steering_raw)
+                    else:
+                        steering_robot = self.pos_angle_lookup.cmd_to_speed(steering_raw)
+
+                # Publish steering/throttle after trimming and limits
+                real_cmd_msg = Twist()
+                real_cmd_msg.linear.x = throttle_robot
+                real_cmd_msg.angular.z = steering_robot
+                self.pub_real_cmd.publish(real_cmd_msg)
 
                 # Steering directly from raw
                 self.steering = clamp(steering_raw, self.min_str, self.max_str)

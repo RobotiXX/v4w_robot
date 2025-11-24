@@ -2,6 +2,7 @@
 
 import sys
 import os
+import math
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import rospy
@@ -11,7 +12,7 @@ from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import TransformStamped
 from imu_processor import ImuProcessor
-from utils import angle_to_quaternion, quaternion_to_angle
+from utils import angle_to_quaternion, quaternion_to_angle, ackermann
 
 class OdometryNode:
     def __init__(self):
@@ -22,6 +23,19 @@ class OdometryNode:
         
         # Initialize TF broadcaster
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
+        
+        # Initialize odom publisher
+        self.odom_pub = rospy.Publisher(f'{self.robot_name}/odom', Odometry, queue_size=1)
+        
+        # Initialize pose tracking for estimation
+        from geometry_msgs.msg import Pose
+        self.current_pose = Pose()
+        self.current_pose.position.x = 0.0
+        self.current_pose.position.y = 0.0
+        self.current_pose.position.z = 0.0
+        self.current_pose.orientation.w = 1.0  # identity quaternion
+        self.last_odom_time = rospy.Time(0)
+        self.last_control_time = rospy.Time(0)
         
         self.witIMU = ImuProcessor(imu_topic="/imu",             # Initialize IMU processor
                               mag_topic="/mag", 
@@ -73,6 +87,10 @@ class OdometryNode:
         # Broadcast the transform
         self.tf_broadcaster.sendTransform(transform)
 
+        # Update pose tracking
+        self.current_pose = msg.pose.pose
+        self.last_odom_time = msg.header.stamp
+        
         robot_pitch = quaternion_to_angle(transform.transform.rotation)[1]
 
         # Create and publish TF transform from camera_pivot to camera_base
@@ -95,9 +113,44 @@ class OdometryNode:
     
     def control_callback(self, msg):
         """Handle control command messages"""
-        rospy.logdebug(f"Received control command: {msg.data}")
-        # Process control commands here
-        pass
+        now = rospy.Time.now()
+        if (now - self.last_odom_time).to_sec() > 0.1:  # 100ms timeout
+            dt = (now - self.last_control_time).to_sec() if self.last_control_time != rospy.Time(0) else 0.02
+            self.last_control_time = now
+            
+            throttle = msg.data[1]
+            steering = msg.data[0]
+            
+            delta_pose = ackermann(throttle, steering, dt=dt)
+            
+            # Update position
+            yaw = quaternion_to_angle(self.current_pose.orientation)[2]
+            self.current_pose.position.x += delta_pose[0] * math.cos(yaw) - delta_pose[1] * math.sin(yaw)
+            self.current_pose.position.y += delta_pose[0] * math.sin(yaw) + delta_pose[1] * math.cos(yaw)
+            self.current_pose.position.z += delta_pose[2]
+            
+            # Update orientation
+            roll, pitch, yaw = quaternion_to_angle(self.current_pose.orientation)
+            new_roll = roll + delta_pose[3]
+            new_pitch = pitch + delta_pose[4]
+            new_yaw = yaw + delta_pose[5]
+            self.current_pose.orientation = angle_to_quaternion([new_roll, new_pitch, new_yaw])
+            
+            # Publish TF transform
+            transform = TransformStamped()
+            transform.header.stamp = now
+            transform.header.frame_id = "odom"
+            transform.child_frame_id = f"{self.robot_name}/base_link"
+            transform.transform.translation.x = self.current_pose.position.x
+            transform.transform.translation.y = self.current_pose.position.y
+            transform.transform.translation.z = self.current_pose.position.z
+            transform.transform.rotation = self.current_pose.orientation
+            self.tf_broadcaster.sendTransform(transform)
+            
+            # Also publish camera TF if needed, but since no IMU update, perhaps skip or approximate
+        else:
+            # If odom is recent, reset last_control_time or something, but not necessary
+            pass
     
     def run(self):
         """Main loop"""
