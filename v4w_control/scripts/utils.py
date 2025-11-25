@@ -97,6 +97,13 @@ def odometry_to_particle(odom_msg):
     roll, pitch, yaw = quaternion_to_angle(odom_msg.pose.pose.orientation)
     return [x, y, z, roll, pitch, yaw]
 
+
+def pose_to_particle(odom_msg):
+    if not isinstance(odom_msg, Pose):
+        raise ValueError("Input must be of type Odometry")
+    x, y, z = odom_msg.position.x, odom_msg.position.y, odom_msg.position.z
+    roll, pitch, yaw = quaternion_to_angle(odom_msg.orientation)
+    return [x, y, z, roll, pitch, yaw]
 #ROS related functions
 
 def particle_to_posestamped(particle, frame_id):

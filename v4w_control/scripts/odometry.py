@@ -10,16 +10,17 @@ import tf2_ros
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32MultiArray
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, Twist
 from imu_processor import ImuProcessor
-from utils import angle_to_quaternion, quaternion_to_angle, ackermann
+from utils import angle_to_quaternion, quaternion_to_angle, ackermann, pose_to_particle, to_world_torch
+import torch
 
 class OdometryNode:
     def __init__(self):
         rospy.init_node('odometry_node', anonymous=True)
         
         # Get robot name parameter
-        self.robot_name = rospy.get_param('~robot_name', 'v4w1')
+        self.robot_name = rospy.get_param('robot_name', 'v4w1')
         
         # Initialize TF broadcaster
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -36,29 +37,30 @@ class OdometryNode:
         self.current_pose.orientation.w = 1.0  # identity quaternion
         self.last_odom_time = rospy.Time(0)
         self.last_control_time = rospy.Time(0)
+        self.robot_pitch = 0
         
-        self.witIMU = ImuProcessor(imu_topic="/imu",             # Initialize IMU processor
-                              mag_topic="/mag", 
+        self.cameraIMU = ImuProcessor(imu_topic="imu",             # Initialize IMU processor
+                              mag_topic="mag", 
                               sampling_rate=800,
                               method='madgwick', use_mag=False, tait_bryan=False)     
         
         # Initialize subscribers
         self.odom_sub = rospy.Subscriber(
-            f'natnet_ros/{self.robot_name}/odom', 
+            f'/natnet_ros/{self.robot_name}/odom', 
             Odometry, 
             self.odom_callback
         )
         
         self.control_sub = rospy.Subscriber(
-            f'{self.robot_name}/control', 
-            Float32MultiArray, 
+            f'real_cmd_vel', 
+            Twist, 
             self.control_callback
         )
         
         rospy.loginfo(f"Odometry node initialized for robot: {self.robot_name}")
         rospy.loginfo(f"Subscribed to:")
         rospy.loginfo(f"  - natnet_ros/{self.robot_name}/odom")
-        rospy.loginfo(f"  - /imu")
+        rospy.loginfo(f"  - {self.robot_name}/imu")
         rospy.loginfo(f"  - {self.robot_name}/control")
         rospy.loginfo(f"Publishing TF: odom -> {self.robot_name}/base_link")
     
@@ -91,7 +93,7 @@ class OdometryNode:
         self.current_pose = msg.pose.pose
         self.last_odom_time = msg.header.stamp
         
-        robot_pitch = quaternion_to_angle(transform.transform.rotation)[1]
+        self.robot_pitch = quaternion_to_angle(transform.transform.rotation)[1]
 
         # Create and publish TF transform from camera_pivot to camera_base
         transform = TransformStamped()
@@ -104,8 +106,8 @@ class OdometryNode:
         transform.transform.translation.y = 0
         transform.transform.translation.z = 0
 
-        pitch_camera = self.witIMU.angles[1]
-        transform.transform.rotation = angle_to_quaternion([0.0, -(pitch_camera+robot_pitch), 0.0])
+        pitch_camera = self.cameraIMU.angles[1]
+        transform.transform.rotation = angle_to_quaternion([0.0, -(pitch_camera+self.robot_pitch), 0.0])
         
         # Broadcast the transform
         self.tf_broadcaster.sendTransform(transform)
@@ -118,23 +120,22 @@ class OdometryNode:
             dt = (now - self.last_control_time).to_sec() if self.last_control_time != rospy.Time(0) else 0.02
             self.last_control_time = now
             
-            throttle = msg.data[1]
-            steering = msg.data[0]
+            throttle = msg.linear.x
+            steering = msg.angular.z
             
-            delta_pose = ackermann(throttle, steering, dt=dt)
-            
+            delta_pose = ackermann(throttle, steering, dt=dt, wheel_base=0.312)
+            next_pose = to_world_torch(torch.Tensor(pose_to_particle(self.current_pose)), delta_pose).squeeze().numpy()
+
+
             # Update position
             yaw = quaternion_to_angle(self.current_pose.orientation)[2]
-            self.current_pose.position.x += delta_pose[0] * math.cos(yaw) - delta_pose[1] * math.sin(yaw)
-            self.current_pose.position.y += delta_pose[0] * math.sin(yaw) + delta_pose[1] * math.cos(yaw)
-            self.current_pose.position.z += delta_pose[2]
+            self.current_pose.position.x = next_pose[0]
+            self.current_pose.position.y = next_pose[1]
+            self.current_pose.position.z = next_pose[2]
             
             # Update orientation
-            roll, pitch, yaw = quaternion_to_angle(self.current_pose.orientation)
-            new_roll = roll + delta_pose[3]
-            new_pitch = pitch + delta_pose[4]
-            new_yaw = yaw + delta_pose[5]
-            self.current_pose.orientation = angle_to_quaternion([new_roll, new_pitch, new_yaw])
+           
+            self.current_pose.orientation = angle_to_quaternion(next_pose[3:])
             
             # Publish TF transform
             transform = TransformStamped()
@@ -147,7 +148,24 @@ class OdometryNode:
             transform.transform.rotation = self.current_pose.orientation
             self.tf_broadcaster.sendTransform(transform)
             
-            # Also publish camera TF if needed, but since no IMU update, perhaps skip or approximate
+
+            # Create and publish TF transform from camera_pivot to camera_base
+            transform = TransformStamped()
+            transform.header.stamp = now
+            transform.header.frame_id = f"{self.robot_name}/camera_pivot"
+            transform.child_frame_id = f"{self.robot_name}/camera_base"
+            
+            # Copy position from odometry message
+            transform.transform.translation.x = 0.013
+            transform.transform.translation.y = 0
+            transform.transform.translation.z = 0
+
+            pitch_camera = self.cameraIMU.angles[1]
+            self.camera_offset = pitch_camera+self.robot_pitch
+            transform.transform.rotation = angle_to_quaternion([0.0, -(self.camera_offset), 0.0])
+            
+            # Broadcast the transform
+            self.tf_broadcaster.sendTransform(transform)    
         else:
             # If odom is recent, reset last_control_time or something, but not necessary
             pass

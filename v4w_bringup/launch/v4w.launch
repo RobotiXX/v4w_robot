@@ -2,7 +2,7 @@
 	<group ns="v4w">
 		<!-- v4w control -->
 		<include file="$(find v4w_control)/launch/v4w_control.launch" >
-			<arg name="en_cam_control" default="False" />
+			<arg name="en_cam_control" default="false" />
 		</include>
 
 		<!-- launch azure kinet drivers -->

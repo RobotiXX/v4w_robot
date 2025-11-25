@@ -1,18 +1,29 @@
 <launch>
-	<arg name="en_cam_control" default="False" />
+	<group ns="v4w1">
+		<arg name="en_cam_control" default="false" />
 
-	<!-- load the parameters from config file -->
-	<rosparam file="$(find v4w_control)/config/param.yaml" command="load"/>
+		<!-- load the parameters from config file -->
+		<rosparam file="$(find v4w_control)/config/param.yaml" command="load"/>
 
-	<node pkg="rosserial_python" type="serial_node.py" name="v4w_controller"/>
+		<node pkg="rosserial_python" type="serial_node.py" name="v4w_controller"/>
 
-	<!-- launch joystick node for PS4 joystick -->
-	<node pkg="joy" type="joy_node" name="joystick" />
+		<!-- launch joystick node for PS4 joystick -->
+		<node pkg="joy" type="joy_node" name="joystick" />
 
-	<!-- launch camera stabilize if it is enabled -->
-	<node if="${en_cam_control}" pkg="v4w_control" type="camera_stablilizer.py" name="camera_stablilizer" />
-	
-	<!-- launch the command control and teleop -->
-	<node pkg ="v4w_control" type ="control.py" name ="v4w_control"/>
-	    
+		<!-- launch camera stabilize if it is enabled -->
+		<node pkg="v4w_control" type="odometry.py" name="odometry" output="screen"/>
+		
+		<!-- launch the command control and teleop -->
+		<node pkg ="v4w_control" type ="control.py" name ="v4w_control" output="screen"/>
+
+		<arg name="tf_prefix" default="v4w1/" />
+
+		<!-- Load robot description -->
+		<param name="robot_description" command="$(find xacro)/xacro $(find v4w_description)/urdf/v4w.xacro prefix:=$(arg tf_prefix)" />
+
+		<!-- Robot state publisher with tf_prefix -->
+		<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher">
+		</node>
+
+	</group>
 </launch>

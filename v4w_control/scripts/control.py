@@ -15,6 +15,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from spline_lookup import SplineLookupTable
+from  utils import map_range
 
 def clamp(x, x_min, x_max):
     return max(x_min, min(x_max, x))
@@ -70,31 +71,41 @@ class VertiWheelControlNode:
 
         # ===== Parameters =====
         # Control loop
-        self.control_rate = rospy.get_param("~control_rate", 50.0)
-        self.auto_cmd_timeout = rospy.get_param("~auto_cmd_timeout", 0.5)  # s
-        self.deadzone = rospy.get_param("~deadzone", 0.05)
+        self.control_rate = rospy.get_param("control_rate", 50.0)
+        self.auto_cmd_timeout = rospy.get_param("auto_cmd_timeout", 0.5)  # s
+        self.deadzone = rospy.get_param("deadzone", 0.05)
 
         # Velocity / acceleration limits (same units as cmd_vel.linear.x)
-        self.max_vel = rospy.get_param("~v4w_control/max_vel", 3.0)
-        self.min_vel = rospy.get_param("~v4w_control/min_vel", -3.0)
-        self.max_acc = rospy.get_param("~v4w_control/max_acc", 3.0)   # m/s^2
-        self.min_acc = rospy.get_param("~v4w_control/min_acc", -3.0)  # m/s^2
+        self.max_vel = rospy.get_param("v4w_control/max_vel", 3.0)
+        self.min_vel = rospy.get_param("v4w_control/min_vel", -3.0)
+        self.max_acc = rospy.get_param("v4w_control/max_acceleration", 3.0)   # m/s^2
+        self.min_acc = rospy.get_param("v4w_control/max_acceleration", -3.0)  # m/s^2
+
+        self.min_joy_vel = rospy.get_param("v4w_control/min_joy_vel", -0.5)
+        self.max_joy_vel = rospy.get_param("v4w_control/max_joy_vel", 0.5)
 
         # Steering limits (steering command units, e.g. normalized [-1,1] or radians)
-        self.max_str = rospy.get_param("~v4w_control/max_str", 1.0)
-        self.min_str = rospy.get_param("~v4w_control/min_str", -1.0)
-        self.steer_trim_step = rospy.get_param("~v4w_control/steer_trim_step", 0.05)
-        self.steer_trim_limit = rospy.get_param("~v4w_control/steer_trim_limit", 0.3)
+        self.max_str = rospy.get_param("v4w_control/max_str", 1.0)
+        self.max_angle = rospy.get_param("v4w_control/max_steering_angle", 30.0*math.pi/180.0)
+        self.min_str = rospy.get_param("v4w_control/min_str", -1.0)
+        self.min_angle = rospy.get_param("v4w_control/min_steering_angle", -30.0*math.pi/180.0)
+        self.steer_trim_step = rospy.get_param("v4w_control/steer_trim_step", 0.05)
+        self.steer_trim_limit = rospy.get_param("v4w_control/steer_trim_limit", 0.3)
 
         # Camera parameters (angle units arbitrary but consistent)
-        cam_kp = rospy.get_param("~camera_stabilizer/cam_kp", 1.0)
-        cam_ki = rospy.get_param("~camera_stabilizer/cam_ki", 0.0)
-        cam_kd = rospy.get_param("~camera_stabilizer/cam_kd", 0.0)
-        cam_i_max = rospy.get_param("~camera_stabilizer/cam_i_max", 0.5)
-        self.cam_reset_angle = rospy.get_param("~camera_stabilizer/cam_reset_angle", 0.0)
-        self.cam_min_angle = rospy.get_param("~camera_stabilizer/cam_min_angle", -0.7)
-        self.cam_max_angle = rospy.get_param("~camera_stabilizer/cam_max_angle", 0.7)
-        self.cam_step = rospy.get_param("~camera_stabilizer/cam_step", 0.05)
+        cam_kp = rospy.get_param("camera_stabilizer/cam_kp", 1.0)
+        cam_ki = rospy.get_param("camera_stabilizer/cam_ki", 0.0)
+        cam_kd = rospy.get_param("camera_stabilizer/cam_kd", 0.0)
+        cam_i_max = rospy.get_param("camera_stabilizer/cam_i_max", 0.5)
+        self.cam_reset_angle = rospy.get_param("camera_stabilizer/cam_reset_angle", 0.3)
+        self.cam_min_angle = rospy.get_param("camera_stabilizer/cam_min_angle", 0.3)
+        self.cam_max_angle = rospy.get_param("camera_stabilizer/cam_max_angle", 1.0)
+        self.cam_step = rospy.get_param("camera_stabilizer/cam_step", 0.05)
+        if self.cam_reset_angle < self.cam_min_angle or self.cam_reset_angle > self.cam_max_angle:
+            rospy.logwarn(
+                "Camera reset angle is out of min/max bounds; clamping.")
+            self.cam_reset_angle = clamp(
+                self.cam_reset_angle, self.cam_min_angle, self.cam_max_angle)    
 
         self.cam_pid = PID(
             kp=cam_kp,
@@ -105,27 +116,27 @@ class VertiWheelControlNode:
         )
 
         # Initial diff/gear state
-        self.gear = rospy.get_param("~v4w_control/gear_state", 0)  # 0 = low, 1 = high
-        self.front_diff = rospy.get_param("~v4w_control/front_diff_state", 0)  # 0 = unlocked, 1 = locked
-        self.rear_diff = rospy.get_param("~v4w_control/rear_diff_state", 0)  # 0 = unlocked, 1 = locked
+        self.gear = rospy.get_param("v4w_control/gear_state", 0)  # 0 = low, 1 = high
+        self.front_diff = rospy.get_param("v4w_control/front_diff_state", 0)  # 0 = unlocked, 1 = locked
+        self.rear_diff = rospy.get_param("v4w_control/rear_diff_state", 0)  # 0 = unlocked, 1 = locked
 
         # Joystick mapping (PS4 defaults, override with params if needed)
-        self.axis_steer = rospy.get_param("~v4w_control/axis_steer", 0)  # left stick LR
-        self.axis_throttle = rospy.get_param("~v4w_control/axis_throttle", 4)  # right stick UD
-        self.axis_dpad_x = rospy.get_param("~v4w_control/axis_dpad_x", 6)
-        self.axis_dpad_y = rospy.get_param("~v4w_control/axis_dpad_y", 7)
+        self.axis_steer = rospy.get_param("v4w_control/axis_steer", 0)  # left stick LR
+        self.axis_throttle = rospy.get_param("v4w_control/axis_throttle", 4)  # right stick UD
+        self.axis_dpad_x = rospy.get_param("v4w_control/axis_dpad_x", 6)
+        self.axis_dpad_y = rospy.get_param("v4w_control/axis_dpad_y", 7)
 
-        self.fd_lock = rospy.get_param("~v4w_control/btn_square", 0)
-        self.fd_unlock = rospy.get_param("~v4w_control/btn_cross", 1)
-        self.rd_unlock = rospy.get_param("~v4w_control/btn_circle", 2)
-        self.rd_lock = rospy.get_param("~v4w_control/btn_triangle", 3)
-        self.gear_low = rospy.get_param("~v4w_control/btn_l1", 4)
-        self.gear_high = rospy.get_param("~v4w_control/btn_l2", 5)
-        self.disarm = rospy.get_param("~v4w_control/btn_share", 8)
-        self.arm = rospy.get_param("~v4w_control/btn_options", 9)
-        self.mode_switch = rospy.get_param("~v4w_control/btn_l3", 10)
-        self.cam_stb_sw = rospy.get_param("~v4w_control/btn_r3", 11)
-        self.cam_reset = rospy.get_param("~v4w_control/btn_ps", 12)
+        self.fd_lock = rospy.get_param("v4w_control/btn_square", 0)
+        self.fd_unlock = rospy.get_param("v4w_control/btn_cross", 1)
+        self.rd_unlock = rospy.get_param("v4w_control/btn_circle", 2)
+        self.rd_lock = rospy.get_param("v4w_control/btn_triangle", 3)
+        self.gear_low = rospy.get_param("v4w_control/btn_l1", 4)
+        self.gear_high = rospy.get_param("v4w_control/btn_l2", 5)
+        self.disarm = rospy.get_param("v4w_control/btn_share", 8)
+        self.arm = rospy.get_param("v4w_control/btn_options", 9)
+        self.mode_switch = rospy.get_param("v4w_control/btn_l3", 10)
+        self.cam_stb_sw = rospy.get_param("v4w_control/btn_r3", 11)
+        self.cam_reset = rospy.get_param("v4w_control/btn_ps", 12)
 
         # Safe command on startup / lock
         self.safe_steering = -0.75
@@ -158,7 +169,7 @@ class VertiWheelControlNode:
 
         # ===== ROS I/O =====
         self.pub_control = rospy.Publisher("control", Float32MultiArray, queue_size=1)
-        self.pub_real_cmd = rospy.Publisher("~real_cmd_vel", Twist, queue_size=1)
+        self.pub_real_cmd = rospy.Publisher("real_cmd_vel", Twist, queue_size=1)
 
         rospy.Subscriber("joy", Joy, self.joy_callback, queue_size=1)
         rospy.Subscriber("cmd_vel", Twist, self.cmd_vel_callback, queue_size=1)
@@ -337,26 +348,30 @@ class VertiWheelControlNode:
         throttle = 0.0
 
         if self.axis_steer < len(axes):
-            steer_val = axes[self.axis_steer]
+            steer_val = -axes[self.axis_steer]*abs(axes[self.axis_steer])
             if abs(steer_val) < self.deadzone:
                 steer_val = 0.0
-            steering = steer_val * self.max_str
+            steering = steer_val 
 
         if self.axis_throttle < len(axes):
-            thr_val = axes[self.axis_throttle]
-            # On PS4, up = -1, down = +1; invert so pushing up is forward (+)
-            thr_val = -thr_val
+
+            thr_val = axes[self.axis_throttle]**1.2 if axes[self.axis_throttle]>=0 else -(-axes[self.axis_throttle])**2.0
+            
+            if thr_val < 0: 
+                thr_val = map_range(thr_val, -1.0, 0.0, self.min_joy_vel, 0.0)
+            else:
+                thr_val = map_range(thr_val, 0.0, 1.0, 0.0, self.max_joy_vel)
             if abs(thr_val) < self.deadzone:
                 thr_val = 0.0
 
-            # Map [-1, 1] to [min_vel, max_vel], allowing asymmetric
+            # Map [-1, 1] to [min_vel, max_vel]
             if thr_val >= 0.0:
-                throttle = thr_val * self.max_vel
+                throttle = thr_val 
             else:
-                throttle = thr_val * abs(self.min_vel)
+                throttle = thr_val 
 
-        steering = clamp(steering + self.steer_trim, self.min_str, self.max_str)
-        return steering, throttle
+        # steering = clamp(steering + self.steer_trim, self.min_str, self.max_str)
+        return steering+ self.steer_trim, throttle
 
     def cmd_vel_to_commands(self, cmd_vel):
         """Map cmd_vel to (steering, throttle_raw) before accel limiting."""
@@ -364,10 +379,14 @@ class VertiWheelControlNode:
             return 0.0, 0.0
 
         v = clamp(cmd_vel.linear.x, self.min_vel, self.max_vel)
-        throttle_robot = self.throttle_lookup.speed_to_cmd(v)
+        if v < 0.0:
+            throttle_robot = -self.throttle_lookup.speed_to_cmd(abs(v))
+        else:
+            throttle_robot = self.throttle_lookup.speed_to_cmd(v)
         # Assuming angular.z is already in steering units, just clamp
-        steering = clamp(cmd_vel.angular.z, self.min_str, self.max_str)
-        steering = clamp(steering + self.steer_trim, self.min_str, self.max_str)
+
+        steering = clamp(cmd_vel.angular.z, self.min_steering_angle, self.max_steering_angle)
+        steering = clamp(steering + self.steer_trim, self.min_steering_angle, self.max_steering_angle)
         if steering < 0.0:
             steering_robot = self.neg_angle_lookup.speed_to_cmd(steering)
         else:
@@ -385,7 +404,7 @@ class VertiWheelControlNode:
             dv = min(dv, max_dv)
         else:
             max_dv = self.min_acc * dt  # negative
-            dv = max(dv, max_dv)
+            dv = min(dv, max_dv)
         return self.throttle + dv
 
     def update_camera(self, dt):
@@ -443,7 +462,10 @@ class VertiWheelControlNode:
                     # Use last joystick axes if available, else keep old commands
                     axes = self.last_joy_axes if self.last_joy_axes else []
                     steering_raw, throttle_raw = self.joy_to_commands(axes)
-                    throttle_robot = self.throttle_lookup.cmd_to_speed(throttle_raw)
+                    if throttle_raw < 0.0:
+                        throttle_robot = -self.throttle_lookup.cmd_to_speed(abs(throttle_raw))*.95
+                    else:
+                        throttle_robot = self.throttle_lookup.cmd_to_speed(throttle_raw)
                     if steering_raw < 0.0:
                         steering_robot = self.neg_angle_lookup.cmd_to_speed(steering_raw)
                     else:
@@ -452,7 +474,7 @@ class VertiWheelControlNode:
                 # Publish steering/throttle after trimming and limits
                 real_cmd_msg = Twist()
                 real_cmd_msg.linear.x = throttle_robot
-                real_cmd_msg.angular.z = steering_robot
+                real_cmd_msg.angular.z = -steering_robot
                 self.pub_real_cmd.publish(real_cmd_msg)
 
                 # Steering directly from raw
@@ -470,6 +492,7 @@ class VertiWheelControlNode:
             msg.data = [
                 float(self.steering),
                 float(self.throttle),
+                0.0,
                 float(self.gear),
                 float(self.front_diff),
                 float(self.rear_diff),

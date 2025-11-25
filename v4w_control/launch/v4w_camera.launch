@@ -1,0 +1,6 @@
+<launch>
+  	<env name="DISPLAY" value=":0"/>
+	<group ns="v4w1">
+  		<include file="$(find azure_kinect_ros_driver)/launch/driver.launch" />
+	</group>
+</launch>
