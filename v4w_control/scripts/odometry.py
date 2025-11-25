@@ -42,7 +42,7 @@ class OdometryNode:
         self.cameraIMU = ImuProcessor(imu_topic="imu",             # Initialize IMU processor
                               mag_topic="mag", 
                               sampling_rate=800,
-                              method='madgwick', use_mag=False, tait_bryan=False)     
+                              method='madgwick', use_mag=False, tait_bryan=False)
         
         # Initialize subscribers
         self.odom_sub = rospy.Subscriber(

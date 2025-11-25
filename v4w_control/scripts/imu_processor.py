@@ -88,7 +88,7 @@ class ImuProcessor:
 
     def __init__(self, imu_topic=None, mag_topic=None, use_mag=True, sampling_rate=None, 
                  init_time = 2, method='madgwick', initial_q=None, initialized=False, 
-                 vel_cutoff=None, vel_deadzone=None, frame='ENU', tait_bryan=False):    
+                 vel_cutoff=None, vel_deadzone=None, frame='NED', tait_bryan=False):    
         
         '''Initialize suscribers to the IMU and magnetometer topics'''
         print("--------IMU processor with parameters: --------\n")

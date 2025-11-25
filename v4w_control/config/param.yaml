@@ -11,13 +11,13 @@ joystick:
   autorepeat_rate: 50 
   coalesce_interval: 0.02
 
-camera_stablilizer:
+camera_stabilizer:
   kp: 0.5
   ki: 0.0
   kd: 0.0
-  reset_angle: 0.0
-  max_angle: 0.5
-  min_angle: -0.1
+  cam_reset_angle: 0.0
+  cam_min_angle: -0.0
+  cam_max_angle: 1.0
   rate: 50
 
 v4w_control:

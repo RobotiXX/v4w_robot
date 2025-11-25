@@ -16,6 +16,8 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from spline_lookup import SplineLookupTable
 from  utils import map_range
+from imu_processor import ImuProcessor
+import numpy as np
 
 def clamp(x, x_min, x_max):
     return max(x_min, min(x_max, x))
@@ -117,8 +119,8 @@ class VertiWheelControlNode:
 
         # Initial diff/gear state
         self.gear = rospy.get_param("v4w_control/gear_state", 0)  # 0 = low, 1 = high
-        self.front_diff = rospy.get_param("v4w_control/front_diff_state", 0)  # 0 = unlocked, 1 = locked
-        self.rear_diff = rospy.get_param("v4w_control/rear_diff_state", 0)  # 0 = unlocked, 1 = locked
+        self.front_diff = rospy.get_param("v4w_control/front_diff_state", 1)  # 0 = unlocked, 1 = locked
+        self.rear_diff = rospy.get_param("v4w_control/rear_diff_state", 1)  # 0 = unlocked, 1 = locked
 
         # Joystick mapping (PS4 defaults, override with params if needed)
         self.axis_steer = rospy.get_param("v4w_control/axis_steer", 0)  # left stick LR
@@ -126,10 +128,10 @@ class VertiWheelControlNode:
         self.axis_dpad_x = rospy.get_param("v4w_control/axis_dpad_x", 6)
         self.axis_dpad_y = rospy.get_param("v4w_control/axis_dpad_y", 7)
 
-        self.fd_lock = rospy.get_param("v4w_control/btn_square", 0)
-        self.fd_unlock = rospy.get_param("v4w_control/btn_cross", 1)
-        self.rd_unlock = rospy.get_param("v4w_control/btn_circle", 2)
-        self.rd_lock = rospy.get_param("v4w_control/btn_triangle", 3)
+        self.fd_lock = rospy.get_param("v4w_control/btn_square", 3)
+        self.fd_unlock = rospy.get_param("v4w_control/btn_cross", 0)
+        self.rd_lock = rospy.get_param("v4w_control/btn_triangle", 2)
+        self.rd_unlock = rospy.get_param("v4w_control/btn_circle", 1)
         self.gear_low = rospy.get_param("v4w_control/btn_l1", 4)
         self.gear_high = rospy.get_param("v4w_control/btn_l2", 5)
         self.disarm = rospy.get_param("v4w_control/btn_share", 8)
@@ -142,8 +144,8 @@ class VertiWheelControlNode:
         self.safe_steering = -0.75
         self.safe_throttle = 0.0
         self.safe_gear = 0.0
-        self.safe_front_diff = 0.0
-        self.safe_rear_diff = 0.0
+        self.safe_front_diff = 1.0
+        self.safe_rear_diff = 1.0
         self.safe_cam = 0.0
 
         # ===== State =====
@@ -173,7 +175,11 @@ class VertiWheelControlNode:
 
         rospy.Subscriber("joy", Joy, self.joy_callback, queue_size=1)
         rospy.Subscriber("cmd_vel", Twist, self.cmd_vel_callback, queue_size=1)
-        rospy.Subscriber("imu", Imu, self.imu_callback, queue_size=1)
+
+        self.cameraIMU = ImuProcessor(imu_topic="imu",             # Initialize IMU processor
+                              mag_topic="mag", 
+                              sampling_rate=800,
+                              method='madgwick', use_mag=False, tait_bryan=False)
 
         rospy.loginfo("VertiWheel control node started in SAFE mode.")
         self.spin()
@@ -197,11 +203,6 @@ class VertiWheelControlNode:
         self.last_cmd_vel = msg
         self.last_cmd_vel_time = rospy.Time.now()
 
-    def imu_callback(self, msg):
-        q = msg.orientation
-        quat = [q.x, q.y, q.z, q.w]
-        _, pitch, _ = euler_from_quaternion(quat)
-        self.pitch = pitch
 
     # --------- Helpers for input handling ---------
 
@@ -487,6 +488,12 @@ class VertiWheelControlNode:
             # Update camera stabilization
             self.update_camera(dt)
 
+            if ((np.pi - np.abs(self.cameraIMU.angles[0])) > 1.0) or (np.abs(self.cameraIMU.angles[1]) > 1.0):
+                # print(f"{np.abs(self.cameraIMU.angles[0:2])=}")
+                self.camera_setpoint = self.cam_min_angle
+            else:
+                self.camera_setpoint = self.camera_angle
+
             # Publish control array: [steering, throttle, gear, front diff, rear diff, camera angle]
             msg = Float32MultiArray()
             msg.data = [
@@ -496,7 +503,7 @@ class VertiWheelControlNode:
                 float(self.gear),
                 float(self.front_diff),
                 float(self.rear_diff),
-                float(self.camera_angle),
+                float(self.camera_setpoint),
             ]
             self.pub_control.publish(msg)
 
