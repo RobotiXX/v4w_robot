@@ -7,7 +7,7 @@
   
   <link name="${prefix}base_link">
     <visual>
-      <origin rpy="0 0 0" xyz="-0.2 0 -0.12"/>
+      <origin rpy="0 0 0" xyz="0.00 0.0 -0.12"/>
       <geometry>
         <mesh filename="package://v4w_description/meshes/v4w.obj" scale="1 1 1"/>
       </geometry>
@@ -16,7 +16,7 @@
       </material>
     </visual>
     <collision>
-      <origin rpy="1.5708 0 0" xyz="-0.2 0 -0.1"/>
+      <origin rpy="1.5708 0 0" xyz="0.0 0.0 -0.12"/>
       <geometry>
         <mesh filename="package://v4w_description/meshes/v4w.stl" scale="1 1 1"/>
       </geometry>

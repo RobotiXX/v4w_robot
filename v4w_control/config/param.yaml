@@ -25,9 +25,9 @@ v4w_control:
   lock_rear_diffs: true
   low_gear: true
   max_vel: 2.1
-  min_vel: -0.5
-  max_joy_vel: 0.5
-  min_joy_vel: -0.3
+  min_vel: -0.8
+  max_joy_vel: 1.0
+  min_joy_vel: -1.0
   max_steering_angle: 0.78
   min_steering_angle: -0.78
   max_acceleration: 5.0

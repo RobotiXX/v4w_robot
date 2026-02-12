@@ -1,0 +1,17 @@
+<launch>
+	<include file="$(find v4w_control)/launch/v4w_camera.launch"/>
+	<group ns="v4w1">
+  		<arg name="robot_name" value="v4w1"/>
+		<!-- elevation mapping -->
+		<env name="PYTHONPATH" value="/home/jetson/.local/lib/python3.8/site-packages:$(env PYTHONPATH)" />
+		<node pkg="elevation_mapping_cupy" type="elevation_mapping_node" name="elevation_mapping" output="screen">
+			<rosparam command="load" file="$(find v4w_control)/config/mapping_param.yaml" />
+			<!-- Frame parameters that need environment variable substitution -->
+			<param name="map_frame" value="odom"/>
+			<param name="base_frame" value="$(arg robot_name)/base_link"/>
+			<param name="corrected_map_frame" value="odom"/>
+			<param name="pointcloud_topics" value="[/$(arg robot_name)/points2]" type="yaml"/>
+		</node>
+
+	</group>
+</launch>

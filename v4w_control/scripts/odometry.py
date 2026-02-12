@@ -26,7 +26,7 @@ class OdometryNode:
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         
         # Initialize odom publisher
-        self.odom_pub = rospy.Publisher(f'{self.robot_name}/odom', Odometry, queue_size=1)
+        # self.odom_pub = rospy.Publisher(f'{self.robot_name}/odom', Odometry, queue_size=1)
         
         # Initialize pose tracking for estimation
         from geometry_msgs.msg import Pose

@@ -87,10 +87,10 @@ class VertiWheelControlNode:
         self.max_joy_vel = rospy.get_param("v4w_control/max_joy_vel", 0.5)
 
         # Steering limits (steering command units, e.g. normalized [-1,1] or radians)
-        self.max_str = rospy.get_param("v4w_control/max_str", 1.0)
+        self.min_angle = rospy.get_param("v4w_control/min_steering_angle", -30.0*math.pi/180.0)
         self.max_angle = rospy.get_param("v4w_control/max_steering_angle", 30.0*math.pi/180.0)
         self.min_str = rospy.get_param("v4w_control/min_str", -1.0)
-        self.min_angle = rospy.get_param("v4w_control/min_steering_angle", -30.0*math.pi/180.0)
+        self.max_str = rospy.get_param("v4w_control/max_str", 1.0)
         self.steer_trim_step = rospy.get_param("v4w_control/steer_trim_step", 0.05)
         self.steer_trim_limit = rospy.get_param("v4w_control/steer_trim_limit", 0.3)
 
@@ -386,8 +386,8 @@ class VertiWheelControlNode:
             throttle_robot = self.throttle_lookup.speed_to_cmd(v)
         # Assuming angular.z is already in steering units, just clamp
 
-        steering = clamp(cmd_vel.angular.z, self.min_steering_angle, self.max_steering_angle)
-        steering = clamp(steering + self.steer_trim, self.min_steering_angle, self.max_steering_angle)
+        steering = clamp(cmd_vel.angular.z, self.min_vel, self.max_vel)
+        steering = clamp(steering + self.steer_trim, self.min_angle, self.max_angle)
         if steering < 0.0:
             steering_robot = self.neg_angle_lookup.speed_to_cmd(steering)
         else:
