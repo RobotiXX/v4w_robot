@@ -352,7 +352,7 @@ class VertiWheelControlNode:
             steer_val = -axes[self.axis_steer]*abs(axes[self.axis_steer])
             if abs(steer_val) < self.deadzone:
                 steer_val = 0.0
-            steering = steer_val 
+            steering = -steer_val 
 
         if self.axis_throttle < len(axes):
 
@@ -456,8 +456,8 @@ class VertiWheelControlNode:
             else:
                 if self.mode == self.MODE_AUTO:
                     steering_raw, throttle_raw = self.cmd_vel_to_commands(self.last_cmd_vel)
-                    steering_robot = steering_raw
-                    throttle_robot = throttle_raw
+                    steering_robot = clamp(self.last_cmd_vel.angular.z, self.min_angle, self.max_angle)
+                    throttle_robot = clamp(self.last_cmd_vel.linear.x, self.min_vel, self.max_vel)
 
                 else:  # MANUAL
                     # Use last joystick axes if available, else keep old commands
@@ -475,9 +475,8 @@ class VertiWheelControlNode:
                 # Publish steering/throttle after trimming and limits
                 real_cmd_msg = Twist()
                 real_cmd_msg.linear.x = throttle_robot
-                real_cmd_msg.angular.z = -steering_robot
+                real_cmd_msg.angular.z = steering_robot
                 self.pub_real_cmd.publish(real_cmd_msg)
-
                 # Steering directly from raw
                 self.steering = clamp(steering_raw, self.min_str, self.max_str)
 
