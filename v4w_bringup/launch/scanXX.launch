@@ -1,0 +1,54 @@
+<launch>
+	    <!-- Static transform parent/child frames. -->
+    <arg name="mocap_frame" default="scanXX" />
+    <arg name="camera_frame" default="camera_base" />
+    <arg name="odom_topic" default="/natnet_ros/scanXX/odom" />
+
+    <!-- Translation in metres. -->
+    <arg name="x" default="0.0156" />
+    <arg name="y" default="0.0" />
+    <arg name="z" default="-0.03215" />
+	    <!-- Rotation in radians (yaw, pitch, roll). -->
+    <arg name="yaw" default="0.0" />
+    <arg name="pitch" default="0.0" />
+    <arg name="roll" default="0.0" />
+
+
+		<!-- launch azure kinet drivers -->
+		<include file="$(find azure_kinect_ros_driver)/launch/driver.launch">
+			<arg name="tf_prefix" value=""/>
+			<arg name="point_cloud" value="true"/>
+			<arg name="rgb_point_cloud" value="false"/>
+			<arg name="fps" value="30"/>
+			<arg name="imu_rate_target" value="200"/>
+		</include>
+
+		<node pkg="tf"
+        type="static_transform_publisher"
+        name="mocap_to_camera_base_tf"
+        args="$(arg x) $(arg y) $(arg z) $(arg yaw) $(arg pitch) $(arg roll) $(arg mocap_frame)/base_link $(arg camera_frame) 100" />
+
+    <!-- Dynamic TF publisher: odom -> scanXX -->
+    <param name="robot_name" value="scanXX" />
+    <node pkg="v4w_control" type="odometry.py" name="odometry" output="screen" />
+
+    <!-- Static transform: map -> odom -->
+    <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0 0 0 0 0 0 map odom 100" />
+
+    <node pkg="elevation_mapping_cupy" type="elevation_mapping_node" name="elevation_mapping" output="screen">
+			<env name="PYTHONPATH" value="/home/jetson/.local/lib/python3.8/site-packages:$(env PYTHONPATH)" />
+			<rosparam command="load" file="$(find v4w_control)/config/mapping_param_rgb.yaml" />
+			
+			<!-- Override subscriber topics to match global camera driver -->
+			<param name="subscribers/color_cam/topic_name" value="/rgb/image_raw" />
+			<param name="subscribers/color_cam/camera_info_topic_name" value="/rgb/camera_info" />
+			<param name="subscribers/front_cam_pointcloud/topic_name" value="/points2" />
+
+			<!-- Frame parameters that need environment variable substitution -->
+			<param name="map_frame" value="map"/>
+			<param name="base_frame" value="scanXX/base_link"/>
+			<param name="corrected_map_frame" value="odom"/>
+			<param name="pointcloud_topics" value="[/points2]" type="yaml"/>
+		</node>
+
+</launch>
