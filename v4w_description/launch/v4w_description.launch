@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="robot_name" default="$(optenv HOSTNAME v4w1)" />
   <!-- TF prefix parameter -->
-  <arg name="tf_prefix" default="v4w1/" />
+  <arg name="tf_prefix" default="$(arg robot_name)/" />
 
   <!-- Load robot description -->
   <param name="robot_description" command="$(find xacro)/xacro $(find v4w_description)/urdf/v4w.xacro prefix:=$(arg tf_prefix)" />

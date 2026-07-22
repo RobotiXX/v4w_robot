@@ -73,12 +73,12 @@ image_channel_fusions:
 #### Subscribers ########
 subscribers:
   dinov3:
-    topic_name: '/v4w1/dinov3/features'
-    camera_info_topic_name: '/v4w1/dinov3/camera_info' 
-    channel_info_topic_name: '/v4w1/dinov3/channel_info'
+    topic_name: 'dinov3/features'
+    camera_info_topic_name: 'dinov3/camera_info' 
+    channel_info_topic_name: 'dinov3/channel_info'
     data_type: image
   front_cam:
-    topic_name: '/v4w1/points2'  # topic name for pointcloud
+    topic_name: 'points2'  # topic name for pointcloud
     data_type: pointcloud
 # pointcloud_topics: ['points2']
 

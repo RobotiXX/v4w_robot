@@ -1,6 +1,7 @@
 <launch>
-	<group ns="v4w1">
-		<arg name="en_cam_control" default="false" />
+	<arg name="robot_name" default="$(optenv HOSTNAME v4w1)" />
+	<arg name="en_cam_control" default="false" />
+	<group ns="$(arg robot_name)">
 
 		<!-- load the parameters from config file -->
 		<rosparam file="$(find v4w_control)/config/param.yaml" command="load"/>
@@ -10,13 +11,14 @@
 		<!-- launch joystick node for PS4 joystick -->
 		<node pkg="joy" type="joy_node" name="joystick" />
 
+		<param name="robot_name" value="$(arg robot_name)" />
 		<!-- launch camera stabilize if it is enabled -->
 		<node pkg="v4w_control" type="odometry.py" name="odometry" output="screen"/>
 		
 		<!-- launch the command control and teleop -->
 		<node pkg ="v4w_control" type ="control.py" name ="v4w_control" output="screen"/>
 
-		<arg name="tf_prefix" default="v4w1/" />
+		<arg name="tf_prefix" default="$(arg robot_name)/" />
 
 		<!-- Load robot description -->
 		<param name="robot_description" command="$(find xacro)/xacro $(find v4w_description)/urdf/v4w.xacro prefix:=$(arg tf_prefix)" />

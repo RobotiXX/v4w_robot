@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import socket
 import math
 from dataclasses import dataclass
 
@@ -67,9 +68,20 @@ class VertiWheelControlNode:
     def __init__(self):
         rospy.init_node("vertiwheeler_control_node")
 
-        self.neg_angle_lookup = SplineLookupTable.load(os.path.dirname(os.path.abspath(__file__))+"/v4w1_neg_steering_calibration")
-        self.pos_angle_lookup = SplineLookupTable.load(os.path.dirname(os.path.abspath(__file__))+"/v4w1_pos_steering_calibration")
-        self.throttle_lookup = SplineLookupTable.load(os.path.dirname(os.path.abspath(__file__))+"/v4w1_linear_calibration")
+        self.robot_name = rospy.get_param('robot_name', socket.gethostname())
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        def get_calib_path(suffix):
+            primary = os.path.join(script_dir, f"{self.robot_name}_{suffix}")
+            if os.path.exists(primary + ".json") or os.path.exists(primary):
+                return primary
+            fallback = os.path.join(script_dir, f"v4w1_{suffix}")
+            rospy.logwarn(f"Calibration file {primary} not found. Falling back to {fallback}")
+            return fallback
+
+        self.neg_angle_lookup = SplineLookupTable.load(get_calib_path("neg_steering_calibration"))
+        self.pos_angle_lookup = SplineLookupTable.load(get_calib_path("pos_steering_calibration"))
+        self.throttle_lookup = SplineLookupTable.load(get_calib_path("linear_calibration"))
 
         # ===== Parameters =====
         # Control loop

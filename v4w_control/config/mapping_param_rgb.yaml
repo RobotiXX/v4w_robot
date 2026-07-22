@@ -79,13 +79,13 @@ layer_specs:
 #### Subscribers ########
 subscribers:
   color_cam:
-      topic_name: '/v4w1/rgb/image_raw'       # Match this to your camera's image topic
-      camera_info_topic_name: '/v4w1/rgb/camera_info'     # Match this to your camera's info topic
-      # channel_info_topic_name: '/v4w1/rgb/channel_info'
+      topic_name: 'rgb/image_raw'       # Match this to your camera's image topic
+      camera_info_topic_name: 'rgb/camera_info'     # Match this to your camera's info topic
+      # channel_info_topic_name: 'rgb/channel_info'
       data_type: image                                    # Defines this as an image input channel
   
   front_cam_pointcloud:
-    topic_name: '/v4w1/points2'  # topic name for pointcloud
+    topic_name: 'points2'  # topic name for pointcloud
     data_type: pointcloud
 # pointcloud_topics: ['points2']
 

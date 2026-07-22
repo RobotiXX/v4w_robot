@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import socket
 import sys
 import os
 import math
@@ -20,7 +21,7 @@ class OdometryNode:
         rospy.init_node('odometry_node', anonymous=True)
         
         # Get robot name parameter
-        self.robot_name = rospy.get_param('robot_name', 'v4w1')
+        self.robot_name = rospy.get_param('robot_name', socket.gethostname())
         
         # Initialize TF broadcaster
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()

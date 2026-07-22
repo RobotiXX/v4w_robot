@@ -1,8 +1,9 @@
 <launch>
   	<env name="DISPLAY" value=":0"/>
-	<group ns="v4w1">
+	<arg name="robot_name" default="$(optenv HOSTNAME v4w1)"/>
+	<group ns="$(arg robot_name)">
   		<env name="DISPLAY" value=":0"/>
-		<arg name="tf_prefix"         default="v4w1/" />                       <!-- Prefix added to tf frame IDs. It typically contains a trailing '_' unless empty. -->
+		<arg name="tf_prefix"         default="$(arg robot_name)/" />                       <!-- Prefix added to tf frame IDs. It typically contains a trailing '_' unless empty. -->
 		<arg name="overwrite_robot_description" default="false" />         <!-- Flag to publish a standalone azure_description instead of the default robot_descrition parameter-->
 
 		<group if="$(arg overwrite_robot_description)">

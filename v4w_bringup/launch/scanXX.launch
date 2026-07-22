@@ -1,14 +1,15 @@
 <launch>
-	    <!-- Static transform parent/child frames. -->
-    <arg name="mocap_frame" default="scanXX" />
+    <arg name="robot_name" default="$(optenv HOSTNAME scanXX)" />
+    <!-- Static transform parent/child frames. -->
+    <arg name="mocap_frame" default="$(arg robot_name)" />
     <arg name="camera_frame" default="camera_base" />
-    <arg name="odom_topic" default="/natnet_ros/scanXX/odom" />
+    <arg name="odom_topic" default="/natnet_ros/$(arg robot_name)/odom" />
 
     <!-- Translation in metres. -->
     <arg name="x" default="0.0156" />
     <arg name="y" default="0.0" />
     <arg name="z" default="-0.03215" />
-	    <!-- Rotation in radians (yaw, pitch, roll). -->
+    <!-- Rotation in radians (yaw, pitch, roll). -->
     <arg name="yaw" default="0.0" />
     <arg name="pitch" default="0.0" />
     <arg name="roll" default="0.0" />
@@ -28,8 +29,8 @@
         name="mocap_to_camera_base_tf"
         args="$(arg x) $(arg y) $(arg z) $(arg yaw) $(arg pitch) $(arg roll) $(arg mocap_frame)/base_link $(arg camera_frame) 100" />
 
-    <!-- Dynamic TF publisher: odom -> scanXX -->
-    <param name="robot_name" value="scanXX" />
+    <!-- Dynamic TF publisher: odom -> robot_name -->
+    <param name="robot_name" value="$(arg robot_name)" />
     <node pkg="v4w_control" type="odometry.py" name="odometry" output="screen" />
 
     <!-- Static transform: map -> odom -->
@@ -46,7 +47,7 @@
 
 			<!-- Frame parameters that need environment variable substitution -->
 			<param name="map_frame" value="map"/>
-			<param name="base_frame" value="scanXX/base_link"/>
+			<param name="base_frame" value="$(arg robot_name)/base_link"/>
 			<param name="corrected_map_frame" value="odom"/>
 			<param name="pointcloud_topics" value="[/points2]" type="yaml"/>
 		</node>

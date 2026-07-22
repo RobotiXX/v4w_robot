@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="vertiwheeler">
   
   <!-- Prefix parameter -->
-  <xacro:arg name="prefix" default="v4w1" />
+  <xacro:arg name="prefix" default="" />
   <xacro:property name="prefix" value="$(arg prefix)" />
   
   <link name="${prefix}base_link">
