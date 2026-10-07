@@ -16,6 +16,7 @@ import socket
 import subprocess
 import threading
 import time
+import xmlrpc.client
 
 import rosgraph
 import rospy
@@ -27,6 +28,16 @@ from v4w_manager.srv import ModuleCommand, ModuleCommandResponse, ModuleLog, Mod
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 STOP_TIMEOUTS = ((signal.SIGINT, 15.0), (signal.SIGTERM, 5.0), (signal.SIGKILL, 2.0))
 MASTER_LOSS_TIMEOUT = 10.0
+MASTER_CHECK_PERIOD = 1.0
+
+
+class _TimeoutTransport(xmlrpc.client.Transport):
+    """XML-RPC with a timeout, so a dead network cannot block the master watchdog for minutes."""
+
+    def make_connection(self, host):
+        connection = super().make_connection(host)
+        connection.timeout = 3.0
+        return connection
 
 
 class Module:
@@ -98,7 +109,9 @@ class ModuleManager:
         self.status_pub = rospy.Publisher("~status", ModuleStatus, queue_size=1, latch=True)
         rospy.Service("~command", ModuleCommand, self._on_command)
         rospy.Service("~log", ModuleLog, self._on_log)
-        self.master_lost_since = None
+        self.master = xmlrpc.client.ServerProxy(rosgraph.get_master_uri(), transport=_TimeoutTransport())
+        self.master_id = self._master_identity()
+        threading.Thread(target=self._watch_master, daemon=True).start()
         rospy.Timer(rospy.Duration(0.5), self._tick)
         rospy.on_shutdown(self.stop_all)
         rospy.loginfo("module manager for %s: %s", self.robot, ", ".join(self.modules))
@@ -237,16 +250,38 @@ class ModuleManager:
                 message=m.message))
         self.status_pub.publish(status)
 
-        # Nodes cannot re-register with a restarted master: stop everything and exit,
-        # so systemd restarts the manager and it registers with the new master.
-        if rosgraph.is_master_online():
-            self.master_lost_since = None
-        elif self.master_lost_since is None:
-            self.master_lost_since = time.monotonic()
-        elif time.monotonic() - self.master_lost_since > MASTER_LOSS_TIMEOUT:
-            rospy.logerr("master gone for %.0f s: stopping all modules and exiting", MASTER_LOSS_TIMEOUT)
-            threading.Thread(target=self._exit_on_master_loss, daemon=True).start()
-            self.master_lost_since = float("inf")
+
+    # ---- master watchdog ----
+    def _master_identity(self):
+        """Something that changes when the master restarts: its run_id (set by roslaunch/roscore), else its pid."""
+        caller = rospy.get_name()
+        code, _, run_id = self.master.getParam(caller, "/run_id")
+        if code == 1:
+            return "run_id " + str(run_id)
+        return "pid %s" % self.master.getPid(caller)[2]
+
+    def _watch_master(self):
+        # Nodes cannot re-register with a restarted master: if the master restarts, or stays
+        # gone, stop everything and exit so systemd restarts the manager against the new one.
+        lost_since = None
+        while not rospy.is_shutdown():
+            time.sleep(MASTER_CHECK_PERIOD)
+            try:
+                identity = self._master_identity()
+            except Exception:  # unreachable, refused, timeout
+                lost_since = lost_since or time.monotonic()
+                if time.monotonic() - lost_since > MASTER_LOSS_TIMEOUT:
+                    reason = "master unreachable for %.0f s" % MASTER_LOSS_TIMEOUT
+                    break
+                continue
+            lost_since = None
+            if identity != self.master_id:
+                reason = "master restarted (%s -> %s)" % (self.master_id, identity)
+                break
+        else:
+            return
+        rospy.logerr("%s: stopping all modules and exiting", reason)
+        self._exit_on_master_loss()
 
     def _exit_on_master_loss(self):
         self.stop_all()

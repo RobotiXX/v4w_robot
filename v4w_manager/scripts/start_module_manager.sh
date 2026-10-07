@@ -13,6 +13,11 @@ if [ -z "$XAUTHORITY" ] && [ -f "/run/user/$(id -u)/gdm/Xauthority" ]; then
   export XAUTHORITY=/run/user/$(id -u)/gdm/Xauthority
 fi
 
+# Wait quietly for the master instead of crash-looping until the base station is up
+until python3 -c "import rosgraph, sys; sys.exit(0 if rosgraph.is_master_online() else 1)" 2>/dev/null; do
+  sleep 2
+done
+
 # rosrun, not roslaunch: on master loss the manager exits and systemd restarts it
 exec rosrun v4w_manager module_manager.py __ns:=/$ROBOT __name:=module_manager \
   _robot_name:=$ROBOT _config:="${V4W_MODULES:-$(rospack find v4w_manager)/config/modules.yaml}"
