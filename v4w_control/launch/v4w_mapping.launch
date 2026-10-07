@@ -1,6 +1,8 @@
 <launch>
 	<arg name="robot_name" default="$(optenv HOSTNAME v4w1)"/>
-	<include file="$(find v4w_control)/launch/v4w_camera.launch">
+	<!-- camera:=false when the camera driver is started separately (v4w_camera.launch) -->
+	<arg name="camera" default="true"/>
+	<include if="$(arg camera)" file="$(find v4w_control)/launch/v4w_camera.launch">
 		<arg name="robot_name" value="$(arg robot_name)"/>
 	</include>
 	<group ns="$(arg robot_name)">
