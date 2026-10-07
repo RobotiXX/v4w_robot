@@ -1,0 +1,8 @@
+<launch>
+  <arg name="robot_name"/>
+  <arg name="config" default="$(find v4w_manager)/config/modules.yaml"/>
+  <node pkg="v4w_manager" type="module_manager.py" name="module_manager" ns="$(arg robot_name)" output="screen">
+    <param name="robot_name" value="$(arg robot_name)"/>
+    <param name="config" value="$(arg config)"/>
+  </node>
+</launch>

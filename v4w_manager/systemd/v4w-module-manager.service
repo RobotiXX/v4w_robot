@@ -1,0 +1,22 @@
+# Install on a robot:
+#   sudo cp v4w-module-manager.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now v4w-module-manager
+# Logs: journalctl -u v4w-module-manager -f   (module output: ~/.ros/module_manager/*.log)
+[Unit]
+Description=v4w module manager (starts control/camera/mapping/MPPI on request)
+Wants=network-online.target
+After=network-online.target avahi-daemon.service
+
+[Service]
+User=jetson
+Environment=ROS_MASTER_URI=http://192.168.0.17:11311
+ExecStart=/home/jetson/catkin_ws/src/v4w_robot/v4w_manager/scripts/start_module_manager.sh
+Restart=always
+RestartSec=3
+# SIGINT to the manager only; it stops the modules itself, the rest gets SIGKILL after the timeout
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

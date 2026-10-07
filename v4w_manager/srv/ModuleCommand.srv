@@ -1,0 +1,6 @@
+# action: start | stop | restart. module "all" stops every module (action stop only).
+string module
+string action
+---
+bool success
+string message

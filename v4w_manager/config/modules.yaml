@@ -1,0 +1,26 @@
+# Modules the manager can start, in the order the Fleet panel shows them.
+# $ROBOT is replaced by the robot name (the hostname unless robot_name is set).
+#   cmd               command to run, usually a roslaunch
+#   requires          modules that must be up first (healthy, if they have a health_topic).
+#                     Stopping a module also stops every module that requires it.
+#   health_topic      topic that must keep publishing for the module to show healthy;
+#                     relative names resolve under /$ROBOT
+#   health_timeout    seconds without a message before it shows unhealthy (default 2)
+#   start_grace       seconds after start before a silent health topic counts as unhealthy (default 30)
+#   zero_cmd_on_stop  publish zero /$ROBOT/cmd_vel before and after stopping
+modules:
+  control:
+    cmd: roslaunch v4w_control v4w_control.launch robot_name:=$ROBOT
+    health_topic: control
+    zero_cmd_on_stop: true
+  camera:
+    cmd: roslaunch v4w_control v4w_camera.launch robot_name:=$ROBOT
+    health_topic: rgb/image_raw
+  mapping:
+    cmd: roslaunch elevation_fusion elevation_fusion.launch robot_ns:=$ROBOT
+    requires: [camera]
+    health_topic: elevation_fusion/elevation_map_raw
+  mppi:
+    cmd: roslaunch xx_mppi_ros1 se3_mppi.launch robot_name:=$ROBOT
+    requires: [control, mapping]
+    zero_cmd_on_stop: true

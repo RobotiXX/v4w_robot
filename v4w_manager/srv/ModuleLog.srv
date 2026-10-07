@@ -1,0 +1,4 @@
+string module
+uint32 lines   # 0 = everything kept (last 500 lines)
+---
+string log
